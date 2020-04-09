@@ -4,9 +4,11 @@ import numpy as np
 
 # boudaries in BGR
 COLORS = {
-	"red":([17, 15, 100], [50, 56, 200]), #red
-	"blue":([86, 31, 4], [220, 88, 50]), #blue
-	"yellow":([25, 146, 190], [62, 174, 250]),#yellow
+	"red":([17, 15, 100], [50, 56, 255]), #red
+	"blue":([86, 31, 4], [250, 88, 50]), #blue
+	"yellow":([0, 146, 190], [62, 250, 250]),#yellow
+	"white":([225,225,225],[255,255,255]),
+	"black":([10,10,10],[10,10,10])
 
 }
 
@@ -16,7 +18,7 @@ def count_nonblack_np(img):
 
     """
     return img.any(axis=-1).sum()
-def extract_color(img,visualize=True):
+def extract_color(img,visualize=False):
 	'''
 
 	:param img: BGR image
@@ -26,7 +28,7 @@ def extract_color(img,visualize=True):
 
 
 	max_ratio =0
-	max_color=None
+	max_color="black"
 
 	for key in COLORS:
 		lower,upper=COLORS[key]
@@ -53,4 +55,4 @@ def extract_color(img,visualize=True):
 			print(ratio)
 			cv2.imshow("images", np.hstack([img, output]))
 			cv2.waitKey(0)
-	return max_color
+	return max_color,COLORS[max_color]
