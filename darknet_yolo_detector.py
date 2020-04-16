@@ -7,6 +7,7 @@ import cv2
 # from Utils.Color_Extraction_RGB import extract_colors,hex_to_rgb
 from Utils.ImageUtitls import *
 from Utils.Color import extract_color
+import dlib
 import matplotlib.pyplot as plt
 import io
 import time
@@ -206,6 +207,11 @@ def detection_video(video_path, net, meta,output_path, threshold=0.3):
     i = 0;
     start = time.time()
 
+    captions_track = []
+    boxes_track = []
+    colors_track=[]
+    t = dlib.correlation_tracker()
+
     frame_rate_calc = 1
     freq = cv2.getTickFrequency()
 
@@ -222,9 +228,12 @@ def detection_video(video_path, net, meta,output_path, threshold=0.3):
             image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             # Display the resulting frame
 
-            # if (i % int((fps * 2)) == 0):
-            if(True):
-
+            if (i % int((fps * 5)) == 0):
+            # if(True):
+                print("Detection")
+                captions_track = []
+                boxes_track = []
+                colors_track = []
                 cv2.imwrite('a.jpg', frame)
                 r = dn.detect(net, meta, 'a.jpg'.encode('utf-8'), thresh=threshold)
                 boxes=[]
@@ -237,20 +246,30 @@ def detection_video(video_path, net, meta,output_path, threshold=0.3):
                     score=str(round(object[1]*100))
                     rect = object[2]
                     centerX, centerY, w, h = rect
-                    w = int(w)
-                    h = int(h)
-                    x1 = int(centerX - w / 2)
-                    y1 = int(centerY - h / 2)
-                    x2=x1+w
-                    y2=y1+h
-                    boxes.append((x1, y1, x2, y2))
-                    classes.append(class_name)
-                    scores.append(score)
+
+                    try:
+
+                        w = int(w)
+                        h = int(h)
+                        x1 = int(centerX - w / 2)
+                        y1 = int(centerY - h / 2)
+                        x2=x1+w
+                        y2=y1+h
+
+
+                        boxes.append((x1, y1, x2, y2))
+                        classes.append(class_name)
+                        scores.append(score)
+                    except:
+                        pass;
 
                 # print("before nms",len(boxes))
-                # nms_idx=non_max_suppression_fast(np.array(boxes),overlapThresh=1)
-                nms_idx = np.arange(0,len(boxes))
+                nms_idx=non_max_suppression_fast(np.array(boxes),overlapThresh=0.5)
+                # nms_idx = np.arange(0,len(boxes))
                 # print("after nms",len(nms_idx))
+
+                n=1 #variable used for assigning tracker ids
+
                 for idx in nms_idx:
                     box_color=(255, 190, 99)
                     class_name=classes[idx]
@@ -268,10 +287,31 @@ def detection_video(video_path, net, meta,output_path, threshold=0.3):
                     else:
                         img = cv2.GaussianBlur(roi, (3, 3), cv2.BORDER_DEFAULT)
                         color_name,color_range=extract_color(img)
-                        # print(color_name)
                         box_color=color_range[1]
 
-                    frame = drawBoxes(frame, (x1, y1, x2, y2), box_color,color_name)
+                    rect = dlib.rectangle(x1, y1, x2, y2)
+                    t = dlib.correlation_tracker()
+                    t.start_track(temp_frame, rect)
+                    # update our set of trackers and corresponding class
+                    captions_track.append(n)
+                    colors_track.append((color_name,box_color))
+                    boxes_track.append(t)
+
+                    frame = drawBoxes(frame, (x1, y1, x2, y2), box_color,str(n))
+                    n=n+1
+            else:
+                for (t, caption,color) in zip(boxes_track, captions_track,colors_track):
+                    # update the tracker and grab the position of the tracked
+                    # object
+                    t.update(temp_frame)
+                    pos = t.get_position()
+                    # unpack the position object
+                    x1 = int(pos.left())
+                    y1 = int(pos.top())
+                    x2 = int(pos.right())
+                    y2 = int(pos.bottom())
+                    color_name,box_color=color
+                    frame = drawBoxes(frame, (x1, y1, x2, y2), box_color, str(caption))
 
 
         cv2.putText(frame, 'FPS: {0:.2f}'.format(frame_rate_calc), (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1,
@@ -291,9 +331,9 @@ def detection_video(video_path, net, meta,output_path, threshold=0.3):
         #     break
 
         # Press Q on keyboard to  exit
-        cv2.waitKey(1)
-        # if cv2.waitKey(0) & 0xFF == ord('q'):
-        #     break
+        # cv2.waitKey(1)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
         # else:
         #     pass
     # When everything done, release the video capture object
@@ -318,12 +358,6 @@ if __name__ == '__main__':
 
     test_file = 'test.mp4'
     # for i in range(0,10):
-    #     detection_image('test_images/red.jpg',net,meta,'results')
+    #     detection_image('test_images/red.jpqqqqqqqqqqqqqqqqg',net,meta,'results')
     detection_video(test_file, net, meta, output_path=os.path.join('results',test_file), threshold=0.5)
-
-    # for v in os.listdir(test_videos_base_path):
-    #     print(v)
-    #     if(len(str.split(v,'.'))==2):
-    #         detection_video(test_videos_base_path+'/'+v,net,meta,output_path=os.path.join(output_path,v),threshold=0.3)
-
 

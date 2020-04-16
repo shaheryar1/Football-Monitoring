@@ -6,8 +6,8 @@ def drawBoxes(image,rect,box_color,caption):
 
     image = cv2.rectangle(image, (x1, y1), (x2, y2), box_color, 4)
     # image = cv2.rectangle(image, (x1, y1 - 30), (x1 + 200, y1), box_color, cv2.FILLED)
-    # font = cv2.FONT_HERSHEY_PLAIN
-    # image = cv2.putText(image, caption, (x1, y1 - 15), font, 1.2, (0, 0, 0), 2)
+    font = cv2.FONT_HERSHEY_PLAIN
+    image = cv2.putText(image, caption, (x1, y1 - 15), font, 1.2, (0, 0, 0), 2)
     return image
 
 
