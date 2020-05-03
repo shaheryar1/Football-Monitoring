@@ -6,41 +6,9 @@ from Utils.Color import extract_color
 import dlib
 import time
 # import darknet as dn
-from darknet.python import darknet as dn
+
 from ultralytics import ultralytics as ul
 from sort import Sort
-
-def detection_image(image_path, net, meta, output_path, threshold=0.3):
-    frame = cv2.imread(image_path)
-    now = time.time()
-    r = dn.detect(net, meta, image_path.encode('utf-8'), thresh=threshold)
-    print(time.time() - now)
-
-    for i, object in enumerate(r):
-        # print(i,p)
-        class_name = (str(object[0])[2:-1])
-        # name = class_name + "-" + str(round(object[1] * 100)) + "%"
-        score = str(round(object[1] * 100))
-        rect = object[2]
-        centerX, centerY, w, h = rect
-        w = int(w)
-        h = int(h)
-        x1 = int(centerX - w / 2)
-        y1 = int(centerY - h / 2)
-        x2 = x1 + w
-        y2 = y1 + h
-
-        # rect = box.astype(int)
-        # x1, y1, x2, y2 = rect
-        box_color = (255, 190, 99)
-        caption = class_name + " - " + score + "%"
-        frame = drawBoxes(frame, (x1, y1, x2, y2), box_color, caption)
-    img_name = str.split(image_path, '/')[-1]
-    # print(img_name)
-
-    cv2.imwrite(os.path.join(output_path, img_name), frame)
-
-
 
 def detection_video(video_path, net, meta, output_path, threshold=0.5, detection_refresh_rate=1, model_type=1):
     print(output_path)
@@ -95,7 +63,6 @@ def detection_video(video_path, net, meta, output_path, threshold=0.5, detection
                 boxes_track = []
                 colors_track = []
 
-                cv2.imwrite('a.jpg', frame)
                 # print("saved frame")
                 boxes = []
                 scores = []
@@ -391,15 +358,7 @@ def detection_video_with_sort_tracker(video_path, output_path, threshold=0.5, de
 
 
 
-model_cfg = 'darknet/cfg/yolov3.cfg'
-model_weights = 'darknet/yolov3.weights'
-meta_data = 'darknet/cfg/coco.data'
-
 if __name__ == '__main__':
-    # net = dn.load_net(model_cfg.encode('utf-8'),
-    #                   model_weights.encode('utf-8'), 0)
-    # meta = dn.load_meta(meta_data.encode('utf-8'))
-
     test_file = 'WP vs FSCI.mp4'
     # for i in range(0,10):
     #     detection_image('test_images/red.jpg',net,meta,'results')
