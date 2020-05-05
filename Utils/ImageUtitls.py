@@ -3,8 +3,13 @@ import numpy as np
 
 def drawBoxes(image,rect,box_color,caption):
     x1, y1, x2, y2 = rect
+    x1=int(x1)
+    y1 = int(y1)
+    x2 = int(x2)
+    y2=int(y2)
 
-    image = cv2.rectangle(image, (x1, y1), (x2, y2), box_color, 4)
+
+    image = cv2.rectangle(image, (x1, y1), (x2, y2), box_color, 2)
     # image = cv2.rectangle(image, (x1, y1 - 30), (x1 + 200, y1), box_color, cv2.FILLED)
     font = cv2.FONT_HERSHEY_PLAIN
     image = cv2.putText(image, caption, (x1, y1 - 15), font, 1.2, box_color, 2)
@@ -29,7 +34,19 @@ def IoU(boxA, boxB):
     # return the intersection over union value
     return iou
 
+def convert_xml_coordinates_to_yolo(size, box):
 
+    # x = (box[0]+box[1])/2.0
+    # y = (box[2]+box[3])/2.0
+    x=box[0]
+    y=box[1]
+    w = box[2]-box[0]
+    h = box[3]-box[1]
+    x = x
+    w = w
+    y = y
+    h = h
+    return (x,y,w,h)
 
 def nms(bounding_boxes, confidence_score, threshold):
     # If no bounding boxes, return empty list

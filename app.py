@@ -4,8 +4,6 @@ import time
 
 import sys
 
-for p in sys.path:
-    print(p)
 if __name__ == '__main__':
 
 
