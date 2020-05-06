@@ -34,10 +34,7 @@ def IoU(boxA, boxB):
     # return the intersection over union value
     return iou
 
-def convert_xml_coordinates_to_yolo(size, box):
-
-    # x = (box[0]+box[1])/2.0
-    # y = (box[2]+box[3])/2.0
+def convert_bbox_to_deep_sort_format(size, box):
     x=box[0]
     y=box[1]
     w = box[2]-box[0]

@@ -5,7 +5,8 @@ import os
 import numpy as np
 from torch.backends import cudnn
 import sys
-from Utils.ImageUtitls import drawBoxes,convert_xml_coordinates_to_yolo
+from Utils.Color import extract_color
+from Utils.ImageUtitls import drawBoxes,convert_bbox_to_deep_sort_format
 sys.path.append('Yet-Another-EfficientDet-Pytorch')
 
 from backbone import EfficientDetBackbone
@@ -22,17 +23,6 @@ from deep_sort.tools import generate_detections as gdet
 from deep_sort.deep_sort.detection import Detection as ddet
 
 # Constants
-
-OPENCV_OBJECT_TRACKERS = {
-	"csrt": cv2.TrackerCSRT_create,
-	"kcf": cv2.TrackerKCF_create,
-	"boosting": cv2.TrackerBoosting_create,
-	"mil": cv2.TrackerMIL_create,
-	"tld": cv2.TrackerTLD_create,
-	"medianflow": cv2.TrackerMedianFlow_create,
-	"mosse": cv2.TrackerMOSSE_create
-}
-
 obj_list = ['person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light',
             'fire hydrant', '', 'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep',
             'cow', 'elephant', 'bear', 'zebra', 'giraffe', '', 'backpack', 'umbrella', '', '', 'handbag', 'tie',
@@ -43,9 +33,11 @@ obj_list = ['person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train'
             'laptop', 'mouse', 'remote', 'keyboard', 'cell phone', 'microwave', 'oven', 'toaster', 'sink',
             'refrigerator', '', 'book', 'clock', 'vase', 'scissors', 'teddy bear', 'hair drier',
             'toothbrush']
-
-# tf bilinear interpolation is different from any other's, just make do
 input_sizes = [512, 640, 768, 896, 1024, 1280, 1280, 1536]
+
+
+color_dict={}
+
 def display(preds, imgs):
 
     for i in range(len(imgs)):
@@ -82,6 +74,20 @@ def decode_predictions(preds,classes_filter = ["person"]):
     return boxes,classes,scores
 
 
+def update_color_association(roi, id):
+    if(color_dict.get(id) is not  None):
+        return color_dict[id]
+    else:
+        H, W, C = roi.shape
+        roi = roi[0:int(H / 2), :]
+        if(H<=10 or W <=10):
+            return [0,0,0]
+        name,color_range = extract_color(roi, visualize=False)
+        color_dict[id]=color_range[1]
+        return color_dict[id]
+
+
+
 
 def efficientDet_video_inference(video_src,compound_coef = 0,force_input_size=None,
                                  frame_skipping = 3,
@@ -99,8 +105,9 @@ def efficientDet_video_inference(video_src,compound_coef = 0,force_input_size=No
     model_filename = '/home/shaheryar/Desktop/Projects/Football-Monitoring/deep_sort/model_weights/mars-small128.pb'
     encoder = gdet.create_box_encoder(model_filename, batch_size=1)
     metric = nn_matching.NearestNeighborDistanceMetric("cosine", max_cosine_distance, nn_budget)
-    tracker = Tracker(metric)
+    tracker = Tracker(metric,n_init=5)
 
+    # efficientDet-pytorch variables
     iou_threshold = 0.4
     use_cuda = True
     use_float16 = False
@@ -153,6 +160,7 @@ def efficientDet_video_inference(video_src,compound_coef = 0,force_input_size=No
             else:
                 x = torch.stack([torch.from_numpy(fi) for fi in framed_imgs], 0)
             # model predict
+            t1=time.time()
             with torch.no_grad():
                 features, regression, classification, anchors = model(x)
 
@@ -165,10 +173,10 @@ def efficientDet_video_inference(video_src,compound_coef = 0,force_input_size=No
             # decoding bbox ,object name and scores
             boxes,classes,scores =decode_predictions(out[0])
             org_boxes = boxes.copy()
-
+            t2 = time.time() - t1
 
             # feature extraction for deep sort
-            boxes = [convert_xml_coordinates_to_yolo(frame.shape, b) for b in boxes]
+            boxes = [convert_bbox_to_deep_sort_format(frame.shape, b) for b in boxes]
 
             features = encoder(frame,boxes)
             detections = [Detection(bbox, 1.0, feature) for bbox, feature in zip(boxes, features)]
@@ -181,35 +189,37 @@ def efficientDet_video_inference(video_src,compound_coef = 0,force_input_size=No
             tracker.update(detections)
 
 
+
         i = i + 1
         img_show=frame.copy()
-        # for j in range(len(org_boxes)):
-        #     img_show =drawBoxes(img_show,org_boxes[j],(255,255,0),str(tracker.tracks[j].track_id))
+        for j in range(len(org_boxes)):
+            img_show =drawBoxes(img_show,org_boxes[j],(255,255,0),str(tracker.tracks[j].track_id))
 
         for track in tracker.tracks:
             if not track.is_confirmed() or track.time_since_update > 1:
                 continue
             bbox = track.to_tlbr()
-            cv2.rectangle(img_show, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (255, 255, 255), 2)
-            cv2.putText(img_show, str(track.track_id), (int(bbox[0]), int(bbox[1])), 0, 5e-3 * 200, (0, 255, 0), 2)
+            x1=int(bbox[0])
+            y1 = int(bbox[1])
+            x2 = int(bbox[2])
+            y2=int(bbox[3])
+            roi= frame[y1:y2,x1:x2]
+            cv2.rectangle(img_show, (x1, y1), (x2, y2), update_color_association(roi, track.track_id), 2)
+            cv2.putText(img_show, str(track.track_id), (x1, y1), 0, 5e-3 * 100, (255, 255, 0), 1)
 
-        # for det in boxes:
-        #     bbox = det.to_tlbr()
-        #     cv2.rectangle(frame, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (255, 0, 0), 2)
 
-
-        t2 = time.time() - t1
         if display_fps:
             current_frame_fps=1/t2
         else:
             current_frame_fps=0
 
-        # cv2.putText(frame, 'FPS: {0:.2f}'.format(current_frame_fps), (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1,
-        #             (255, 255, 0),
-        #             2, cv2.LINE_AA)
-        # if (i % int(fps) == 0):
-        #     print("Processed ", str(int(i / fps)), "seconds")
-        #     print("Time taken",time.time()-start)
+        cv2.putText(img_show, 'FPS: {0:.2f}'.format(current_frame_fps), (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1,
+                    (255, 255, 0),
+                    2, cv2.LINE_AA)
+        if (i % int(fps) == 0):
+            print("Processed ", str(int(i / fps)), "seconds")
+            print("Time taken",time.time()-start)
+            # print(color_dict)
 
         if imshow:
             img_show=cv2.resize(img_show,(0,0),fx=0.75,fy=0.75)
@@ -226,4 +236,5 @@ def efficientDet_video_inference(video_src,compound_coef = 0,force_input_size=No
 if __name__ == '__main__':
     video_path = "3.mp4"
     efficientDet_video_inference(video_path,compound_coef=0,force_input_size=768,
-                                 out_path=None,imshow=True,frame_skipping=5)
+                                 out_path=None
+                                 ,imshow=True,frame_skipping=5,display_fps=True)
